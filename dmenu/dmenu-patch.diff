@@ -1,0 +1,167 @@
+From 56fc74510fea5e26d52aea28f33bf100b7f0bac0 Mon Sep 17 00:00:00 2001
+From: rLapz <arthurlapz@gmail.com>
+Date: Fri, 25 Jun 2021 18:49:26 +0700
+Subject: [PATCH] 	add border-patch, xyw-patch, and some configurations
+
+---
+ config.def.h | 15 +++++++++++----
+ dmenu.1      | 24 ++++++++++++++++++++++++
+ dmenu.c      | 29 ++++++++++++++++++++++-------
+ 3 files changed, 57 insertions(+), 11 deletions(-)
+
+diff --git a/config.def.h b/config.def.h
+index 1edb647..16e159b 100644
+--- a/config.def.h
++++ b/config.def.h
+@@ -4,14 +4,14 @@
+ static int topbar = 1;                      /* -b  option; if 0, dmenu appears at bottom     */
+ /* -fn option overrides fonts[0]; default X11 font or font set */
+ static const char *fonts[] = {
+-	"monospace:size=10"
++	"Dina:size=10"
+ };
+ static const char *prompt      = NULL;      /* -p  option; prompt to the left of input field */
+ static const char *colors[SchemeLast][2] = {
+ 	/*     fg         bg       */
+-	[SchemeNorm] = { "#bbbbbb", "#222222" },
+-	[SchemeSel] = { "#eeeeee", "#005577" },
+-	[SchemeOut] = { "#000000", "#00ffff" },
++	[SchemeNorm] = { "#f6f5f4", "#000000" },
++	[SchemeSel] = { "#000000", "#f6f5f4" },
++	[SchemeOut] = { "#000000", "#f6f5f4" },
+ };
+ /* -l option; if nonzero, dmenu uses vertical list with given number of lines */
+ static unsigned int lines      = 0;
+@@ -21,3 +21,10 @@ static unsigned int lines      = 0;
+  * for example: " /?\"&[]"
+  */
+ static const char worddelimiters[] = " ";
++
++/* Size of the window border */
++static const unsigned int border_width = 1;
++
++static unsigned int dmw = 700; /* make dmenu this wide */
++static int dmx = 318; /* put dmenu at this x offset */
++static int dmy = 17; /* put dmenu at this y offset (measured from the bottom if topbar is 0) */
+diff --git a/dmenu.1 b/dmenu.1
+index 323f93c..a4ecbbb 100644
+--- a/dmenu.1
++++ b/dmenu.1
+@@ -8,6 +8,12 @@ dmenu \- dynamic menu
+ .IR lines ]
+ .RB [ \-m
+ .IR monitor ]
++.RB [ \-x
++.IR xoffset ]
++.RB [ \-y
++.IR yoffset ]
++.RB [ \-z
++.IR width ]
+ .RB [ \-p
+ .IR prompt ]
+ .RB [ \-fn
+@@ -54,6 +60,24 @@ dmenu lists items vertically, with the given number of lines.
+ dmenu is displayed on the monitor number supplied. Monitor numbers are starting
+ from 0.
+ .TP
++.BI \-x " xoffset"
++dmenu is placed at this offset measured from the left side of the monitor.
++Can be negative.
++If option
++.B \-m
++is present, the measurement will use the given monitor.
++.TP
++.BI \-y " yoffset"
++dmenu is placed at this offset measured from the top of the monitor.  If the
++.B \-b
++option is used, the offset is measured from the bottom.  Can be negative.
++If option
++.B \-m
++is present, the measurement will use the given monitor.
++.TP
++.BI \-z " width"
++sets the width of the dmenu window.
++.TP
+ .BI \-p " prompt"
+ defines the prompt to be displayed to the left of the input field.
+ .TP
+diff --git a/dmenu.c b/dmenu.c
+index 65f25ce..665fdec 100644
+--- a/dmenu.c
++++ b/dmenu.c
+@@ -391,6 +391,13 @@ keypress(XKeyEvent *ev)
+ 		default:
+ 			return;
+ 		}
++	} else if (ev->state & Mod4Mask) { /* vim-like */
++		switch(ksym) {
++		case XK_j: ksym = XK_Down; break;
++		case XK_k: ksym = XK_Up;   break;
++		default:
++			return;
++		}
+ 	}
+ 
+ 	switch(ksym) {
+@@ -637,9 +644,9 @@ setup(void)
+ 				if (INTERSECT(x, y, 1, 1, info[i]))
+ 					break;
+ 
+-		x = info[i].x_org;
+-		y = info[i].y_org + (topbar ? 0 : info[i].height - mh);
+-		mw = info[i].width;
++		x = info[i].x_org + dmx;
++		y = info[i].y_org + (topbar ? dmy : info[i].height - mh - dmy);
++		mw = (dmw>0 ? dmw : info[i].width);
+ 		XFree(info);
+ 	} else
+ #endif
+@@ -647,9 +654,9 @@ setup(void)
+ 		if (!XGetWindowAttributes(dpy, parentwin, &wa))
+ 			die("could not get embedding window attributes: 0x%lx",
+ 			    parentwin);
+-		x = 0;
+-		y = topbar ? 0 : wa.height - mh;
+-		mw = wa.width;
++		x = dmx;
++		y = topbar ? dmy : wa.height - mh - dmy;
++		mw = (dmw>0 ? dmw : wa.width);
+ 	}
+ 	promptw = (prompt && *prompt) ? TEXTW(prompt) - lrpad / 4 : 0;
+ 	inputw = MIN(inputw, mw/3);
+@@ -659,9 +666,10 @@ setup(void)
+ 	swa.override_redirect = True;
+ 	swa.background_pixel = scheme[SchemeNorm][ColBg].pixel;
+ 	swa.event_mask = ExposureMask | KeyPressMask | VisibilityChangeMask;
+-	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, 0,
++	win = XCreateWindow(dpy, parentwin, x, y, mw, mh, border_width,
+ 	                    CopyFromParent, CopyFromParent, CopyFromParent,
+ 	                    CWOverrideRedirect | CWBackPixel | CWEventMask, &swa);
++	XSetWindowBorder(dpy, win, scheme[SchemeSel][ColBg].pixel);
+ 	XSetClassHint(dpy, win, &ch);
+ 
+ 
+@@ -690,6 +698,7 @@ static void
+ usage(void)
+ {
+ 	fputs("usage: dmenu [-bfiv] [-l lines] [-p prompt] [-fn font] [-m monitor]\n"
++	      "             [-x xoffset] [-y yoffset] [-z width]\n"
+ 	      "             [-nb color] [-nf color] [-sb color] [-sf color] [-w windowid]\n", stderr);
+ 	exit(1);
+ }
+@@ -719,6 +728,12 @@ main(int argc, char *argv[])
+ 			lines = atoi(argv[++i]);
+ 		else if (!strcmp(argv[i], "-m"))
+ 			mon = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-x"))   /* window x offset */
++			dmx = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-y"))   /* window y offset (from bottom up if -b) */
++			dmy = atoi(argv[++i]);
++		else if (!strcmp(argv[i], "-z"))   /* make dmenu this wide */
++			dmw = atoi(argv[++i]);
+ 		else if (!strcmp(argv[i], "-p"))   /* adds prompt to left of input field */
+ 			prompt = argv[++i];
+ 		else if (!strcmp(argv[i], "-fn"))  /* font or font set */
+-- 
+2.32.0
+
