@@ -1,7 +1,7 @@
-From 7bed6d87da4f810aefe3612baa4e64b8eaa74b36 Mon Sep 17 00:00:00 2001
+From d8c1e5131601fe36f70f05d35b93c344be7a554a Mon Sep 17 00:00:00 2001
 From: rLapz <arthurlapz@gmail.com>
-Date: Fri, 25 Jun 2021 18:54:43 +0700
-Subject: [PATCH] 	add dwm-focusonclick, dwm-pertag, dwm-spawn, and some
+Date: Wed, 30 Jun 2021 18:59:51 +0700
+Subject: [PATCH] add dwm-focusonclick, dwm-pertag, dwm-spawn, and some
  configurations
 
 ---
@@ -219,7 +219,7 @@ index 1c0b587..17b4ace 100644
  };
  
 diff --git a/dwm.c b/dwm.c
-index b0b3466..8e99e58 100644
+index b0b3466..51d8dca 100644
 --- a/dwm.c
 +++ b/dwm.c
 @@ -20,6 +20,7 @@
@@ -451,7 +451,7 @@ index b0b3466..8e99e58 100644
  		setsid();
  		execvp(((char **)arg->v)[0], (char **)arg->v);
  		fprintf(stderr, "dwm: execvp %s", ((char **)arg->v)[0]);
-@@ -1674,13 +1772,21 @@ tagmon(const Arg *arg)
+@@ -1674,8 +1772,16 @@ tagmon(const Arg *arg)
  void
  tile(Monitor *m)
  {
@@ -459,11 +459,7 @@ index b0b3466..8e99e58 100644
 -	Client *c;
 +	unsigned int i, n, h, mw, my, ty, f = 0;
 +	Client *c, *fc;
- 
- 	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
- 	if (n == 0)
- 		return;
- 
++
 +	for (fc = m->clients; fc; fc = fc->next) {
 +		if (ISVISIBLE(fc))
 +			f++;
@@ -471,10 +467,9 @@ index b0b3466..8e99e58 100644
 +
 +	if (f > 0)
 +		snprintf(m->ltsymbol, sizeof (m->ltsymbol), "%s[%d]", layouts[0].symbol, f);
-+
- 	if (n > m->nmaster)
- 		mw = m->nmaster ? m->ww * m->mfact : 0;
- 	else
+ 
+ 	for (n = 0, c = nexttiled(m->clients); c; c = nexttiled(c->next), n++);
+ 	if (n == 0)
 @@ -1702,7 +1808,7 @@ tile(Monitor *m)
  void
  togglebar(const Arg *arg)
